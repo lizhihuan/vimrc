@@ -280,17 +280,14 @@ endfunction
 " FUNCTION: Bookmark.str() {{{1
 " Get the string that should be rendered in the view for this bookmark
 function! s:Bookmark.str()
-    let pathStrMaxLen = winwidth(g:NERDTree.GetWinNum()) - 4 - strdisplaywidth(self.name)
+    let pathStrMaxLen = winwidth(g:NERDTree.GetWinNum()) - 4 - len(self.name)
     if &nu
         let pathStrMaxLen = pathStrMaxLen - &numberwidth
     endif
 
     let pathStr = self.path.str({'format': 'UI'})
-    if strdisplaywidth(pathStr) > pathStrMaxLen
-        while strdisplaywidth(pathStr) > pathStrMaxLen && strchars(pathStr) > 0
-            let pathStr = substitute(pathStr, '^.', '', '')
-        endwhile
-        let pathStr = '<' . pathStr
+    if len(pathStr) > pathStrMaxLen
+        let pathStr = '<' . strpart(pathStr, len(pathStr) - pathStrMaxLen)
     endif
     return '>' . self.name . ' ' . pathStr
 endfunction
@@ -343,12 +340,7 @@ function! s:Bookmark.Write()
     for j in s:Bookmark.InvalidBookmarks()
         call add(bookmarkStrings, j)
     endfor
-
-    try
-        call writefile(bookmarkStrings, g:NERDTreeBookmarksFile)
-    catch
-        call nerdtree#echoError("Failed to write bookmarks file. Make sure g:NERDTreeBookmarksFile points to a valid location.")
-    endtry
+    call writefile(bookmarkStrings, g:NERDTreeBookmarksFile)
 endfunction
 
 " vim: set sw=4 sts=4 et fdm=marker:

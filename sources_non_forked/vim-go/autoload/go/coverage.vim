@@ -44,19 +44,18 @@ function! go#coverage#Buffer(bang, ...) abort
   let s:toggle = 1
   let l:tmpname = tempname()
 
+  if get(g:, 'go_echo_command_info', 1)
+    echon "vim-go: " | echohl Identifier | echon "testing ..." | echohl None
+  endif
+
   if go#util#has_job()
     call s:coverage_job({
-          \ 'cmd': ['go', 'test', '-tags', go#config#BuildTags(), '-coverprofile', l:tmpname] + a:000,
+          \ 'cmd': ['go', 'test', '-coverprofile', l:tmpname] + a:000,
           \ 'complete': function('s:coverage_callback', [l:tmpname]),
           \ 'bang': a:bang,
           \ 'for': 'GoTest',
-          \ 'statustype': 'coverage',
           \ })
     return
-  endif
-
-  if go#config#EchoCommandInfo()
-    call go#util#EchoProgress("testing...")
   endif
 
   let args = [a:bang, 0, "-coverprofile", l:tmpname]
@@ -64,7 +63,23 @@ function! go#coverage#Buffer(bang, ...) abort
     call extend(args, a:000)
   endif
 
+  let disabled_term = 0
+  if get(g:, 'go_term_enabled')
+    let disabled_term = 1
+    let g:go_term_enabled = 0
+  endif
+
   let id = call('go#test#Test', args)
+
+  if disabled_term
+    let g:go_term_enabled = 1
+  endif
+
+  if has('nvim')
+    call go#jobcontrol#AddHandler(function('s:coverage_handler'))
+    let s:coverage_handler_jobs[id] = l:tmpname
+    return
+  endif
 
   if go#util#ShellError() == 0
     call go#coverage#overlay(l:tmpname)
@@ -91,11 +106,10 @@ function! go#coverage#Browser(bang, ...) abort
   let l:tmpname = tempname()
   if go#util#has_job()
     call s:coverage_job({
-          \ 'cmd': ['go', 'test', '-tags', go#config#BuildTags(), '-coverprofile', l:tmpname],
+          \ 'cmd': ['go', 'test', '-coverprofile', l:tmpname],
           \ 'complete': function('s:coverage_browser_callback', [l:tmpname]),
           \ 'bang': a:bang,
           \ 'for': 'GoTest',
-          \ 'statustype': 'coverage',
           \ })
     return
   endif
@@ -106,9 +120,16 @@ function! go#coverage#Browser(bang, ...) abort
   endif
 
   let id = call('go#test#Test', args)
+  if has('nvim')
+    call go#jobcontrol#AddHandler(function('s:coverage_browser_handler'))
+    let s:coverage_browser_handler_jobs[id] = l:tmpname
+    return
+  endif
+
 
   if go#util#ShellError() == 0
-    call go#tool#ExecuteInDir(['go', 'tool', 'cover', '-html=' . l:tmpname])
+    let openHTML = 'go tool cover -html='.l:tmpname
+    call go#tool#ExecuteInDir(openHTML)
   endif
 
   call delete(l:tmpname)
@@ -256,17 +277,48 @@ function s:coverage_job(args)
   " autowrite is not enabled for jobs
   call go#cmd#autowrite()
 
-  let disabled_term = 0
-  if go#config#TermEnabled()
-    let disabled_term = 1
-    call go#config#SetTermEnabled(0)
-  endif
+  let status_dir =  expand('%:p:h')
+  let Complete = a:args.complete
+  function! s:complete(job, exit_status, data) closure
+    let status = {
+          \ 'desc': 'last status',
+          \ 'type': "coverage",
+          \ 'state': "finished",
+          \ }
 
-  call go#job#Spawn(a:args.cmd, a:args)
+    if a:exit_status
+      let status.state = "failed"
+    endif
 
-  if disabled_term
-    call go#config#SetTermEnabled(1)
-  endif
+    call go#statusline#Update(status_dir, status)
+    return Complete(a:job, a:exit_status, a:data)
+  endfunction
+
+  let a:args.complete = funcref('s:complete')
+  let callbacks = go#job#Spawn(a:args)
+
+  let start_options = {
+        \ 'callback': callbacks.callback,
+        \ 'exit_cb': callbacks.exit_cb,
+        \ 'close_cb': callbacks.close_cb,
+        \ }
+
+  " pre start
+  let dir = getcwd()
+  let cd = exists('*haslocaldir') && haslocaldir() ? 'lcd ' : 'cd '
+  let jobdir = fnameescape(expand("%:p:h"))
+  execute cd . jobdir
+
+  call go#statusline#Update(status_dir, {
+        \ 'desc': "current status",
+        \ 'type': "coverage",
+        \ 'state': "started",
+        \})
+
+  call job_start(a:args.cmd, start_options)
+
+  " post start
+  execute cd . fnameescape(dir)
 endfunction
 
 " coverage_callback is called when the coverage execution is finished
@@ -280,10 +332,47 @@ endfunction
 
 function! s:coverage_browser_callback(coverfile, job, exit_status, data)
   if a:exit_status == 0
-    call go#tool#ExecuteInDir(['go', 'tool', 'cover', '-html=' . a:coverfile])
+    let openHTML = 'go tool cover -html='.a:coverfile
+    call go#tool#ExecuteInDir(openHTML)
   endif
 
   call delete(a:coverfile)
 endfunction
+
+" -----------------------
+" | Neovim job handlers |
+" -----------------------
+
+let s:coverage_handler_jobs = {}
+let s:coverage_browser_handler_jobs = {}
+
+function! s:coverage_handler(job, exit_status, data) abort
+  if !has_key(s:coverage_handler_jobs, a:job.id)
+    return
+  endif
+  let l:tmpname = s:coverage_handler_jobs[a:job.id]
+  if a:exit_status == 0
+    call go#coverage#overlay(l:tmpname)
+  endif
+
+  call delete(l:tmpname)
+  unlet s:coverage_handler_jobs[a:job.id]
+endfunction
+
+function! s:coverage_browser_handler(job, exit_status, data) abort
+  if !has_key(s:coverage_browser_handler_jobs, a:job.id)
+    return
+  endif
+
+  let l:tmpname = s:coverage_browser_handler_jobs[a:job.id]
+  if a:exit_status == 0
+    let openHTML = 'go tool cover -html='.l:tmpname
+    call go#tool#ExecuteInDir(openHTML)
+  endif
+
+  call delete(l:tmpname)
+  unlet s:coverage_browser_handler_jobs[a:job.id]
+endfunction
+
 
 " vim: sw=2 ts=2 et

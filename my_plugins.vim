@@ -1,0 +1,2 @@
+let g:loaded_syntastic_bemhtml_bemhtmllint_checker=0
+let g:loaded_syntastic_loclist=0

@@ -23,15 +23,22 @@ function! nerdtree#ui_glue#createDefaultBindings()
     call NERDTreeAddKeyMap({ 'key': g:NERDTreeMapOpenSplit, 'scope': "Node", 'callback': s."openHSplit" })
     call NERDTreeAddKeyMap({ 'key': g:NERDTreeMapOpenVSplit, 'scope': "Node", 'callback': s."openVSplit" })
 
+    call NERDTreeAddKeyMap({ 'key': g:NERDTreeMapOpenSplit, 'scope': "Bookmark", 'callback': s."openHSplit" })
+    call NERDTreeAddKeyMap({ 'key': g:NERDTreeMapOpenVSplit, 'scope': "Bookmark", 'callback': s."openVSplit" })
+
     call NERDTreeAddKeyMap({ 'key': g:NERDTreeMapPreview, 'scope': "Node", 'callback': s."previewNodeCurrent" })
     call NERDTreeAddKeyMap({ 'key': g:NERDTreeMapPreviewVSplit, 'scope': "Node", 'callback': s."previewNodeVSplit" })
     call NERDTreeAddKeyMap({ 'key': g:NERDTreeMapPreviewSplit, 'scope': "Node", 'callback': s."previewNodeHSplit" })
 
+    call NERDTreeAddKeyMap({ 'key': g:NERDTreeMapPreview, 'scope': "Bookmark", 'callback': s."previewNodeCurrent" })
+    call NERDTreeAddKeyMap({ 'key': g:NERDTreeMapPreviewVSplit, 'scope': "Bookmark", 'callback': s."previewNodeVSplit" })
+    call NERDTreeAddKeyMap({ 'key': g:NERDTreeMapPreviewSplit, 'scope': "Bookmark", 'callback': s."previewNodeHSplit" })
+
     call NERDTreeAddKeyMap({ 'key': g:NERDTreeMapOpenRecursively, 'scope': "DirNode", 'callback': s."openNodeRecursively" })
 
-    call NERDTreeAddKeyMap({ 'key': g:NERDTreeMapUpdir, 'scope': 'all', 'callback': s . 'upDirCurrentRootClosed' })
-    call NERDTreeAddKeyMap({ 'key': g:NERDTreeMapUpdirKeepOpen, 'scope': 'all', 'callback': s . 'upDirCurrentRootOpen' })
-    call NERDTreeAddKeyMap({ 'key': g:NERDTreeMapChangeRoot, 'scope': 'Node', 'callback': s . 'chRoot' })
+    call NERDTreeAddKeyMap({ 'key': g:NERDTreeMapUpdir, 'scope': "all", 'callback': s."upDirCurrentRootClosed" })
+    call NERDTreeAddKeyMap({ 'key': g:NERDTreeMapUpdirKeepOpen, 'scope': "all", 'callback': s."upDirCurrentRootOpen" })
+    call NERDTreeAddKeyMap({ 'key': g:NERDTreeMapChangeRoot, 'scope': "Node", 'callback': s."chRoot" })
 
     call NERDTreeAddKeyMap({ 'key': g:NERDTreeMapChdir, 'scope': "Node", 'callback': s."chCwd" })
 
@@ -142,9 +149,18 @@ function! s:chRoot(node)
 endfunction
 
 " FUNCTION: s:nerdtree#ui_glue#chRootCwd() {{{1
-" Change the NERDTree root to match the current working directory.
+" changes the current root to CWD
 function! nerdtree#ui_glue#chRootCwd()
-    NERDTreeCWD
+    try
+        let cwd = g:NERDTreePath.New(getcwd())
+    catch /^NERDTree.InvalidArgumentsError/
+        call nerdtree#echo("current directory does not exist.")
+        return
+    endtry
+    if cwd.str() == g:NERDTreeFileNode.GetRootForTab().path.str()
+       return
+    endif
+    call s:chRoot(g:NERDTreeDirNode.New(cwd, b:NERDTree))
 endfunction
 
 " FUNCTION: nnerdtree#ui_glue#clearBookmarks(bookmarks) {{{1
@@ -348,6 +364,35 @@ function! s:handleMiddleMouse()
     endif
 endfunction
 
+" FUNCTION: s:jumpToChild(direction) {{{2
+" Args:
+" direction: 0 if going to first child, 1 if going to last
+function! s:jumpToChild(currentNode, direction)
+    if a:currentNode.isRoot()
+        return nerdtree#echo("cannot jump to " . (a:direction ? "last" : "first") .  " child")
+    end
+    let dirNode = a:currentNode.parent
+    let childNodes = dirNode.getVisibleChildren()
+
+    let targetNode = childNodes[0]
+    if a:direction
+        let targetNode = childNodes[len(childNodes) - 1]
+    endif
+
+    if targetNode.equals(a:currentNode)
+        let siblingDir = a:currentNode.parent.findOpenDirSiblingWithVisibleChildren(a:direction)
+        if siblingDir != {}
+            let indx = a:direction ? siblingDir.getVisibleChildCount()-1 : 0
+            let targetNode = siblingDir.getChildByIndex(indx, 1)
+        endif
+    endif
+
+    call targetNode.putCursorHere(1, 0)
+
+    call b:NERDTree.ui.centerView()
+endfunction
+
+
 " FUNCTION: nerdtree#ui_glue#invokeKeyMap(key) {{{1
 "this is needed since I cant figure out how to invoke dict functions from a
 "key map
@@ -355,55 +400,41 @@ function! nerdtree#ui_glue#invokeKeyMap(key)
     call g:NERDTreeKeyMap.Invoke(a:key)
 endfunction
 
-" FUNCTION: s:jumpToFirstChild(node) {{{1
+" FUNCTION: s:jumpToFirstChild() {{{1
+" wrapper for the jump to child method
 function! s:jumpToFirstChild(node)
     call s:jumpToChild(a:node, 0)
 endfunction
 
-" FUNCTION: s:jumpToLastChild(node) {{{1
+" FUNCTION: s:jumpToLastChild() {{{1
+" wrapper for the jump to child method
 function! s:jumpToLastChild(node)
     call s:jumpToChild(a:node, 1)
 endfunction
 
-" FUNCTION: s:jumpToChild(node, last) {{{2
-" Jump to the first or last child node at the same file system level.
-"
-" Args:
-" node: the node on which the cursor currently sits
-" last: 1 (true) if jumping to last child, 0 (false) if jumping to first
-function! s:jumpToChild(node, last)
-    let l:node = a:node.path.isDirectory ? a:node.getCascadeRoot() : a:node
-
-    if l:node.isRoot()
-        return
-    endif
-
-    let l:parent = l:node.parent
-    let l:children = l:parent.getVisibleChildren()
-
-    let l:target = a:last ? l:children[len(l:children) - 1] : l:children[0]
-
-    call l:target.putCursorHere(1, 0)
-    call b:NERDTree.ui.centerView()
-endfunction
-
 " FUNCTION: s:jumpToParent(node) {{{1
-" Move the cursor to the parent of the specified node.  For a cascade, move to
-" the parent of the cascade's first node.  At the root node, do nothing.
+" Move the cursor to the parent of the specified node. For a cascade, move to
+" the parent of the cascade's highest node. At the root, do nothing.
 function! s:jumpToParent(node)
-    let l:node = a:node.path.isDirectory ? a:node.getCascadeRoot() : a:node
+    let l:parent = a:node.parent
 
-    if l:node.isRoot()
-        return
+    " If "a:node" represents a directory, back out of its cascade.
+    if a:node.path.isDirectory
+        while !empty(l:parent) && !l:parent.isRoot()
+            if index(l:parent.getCascade(), a:node) >= 0
+                let l:parent = l:parent.parent
+            else
+                break
+            endif
+        endwhile
     endif
 
-    if empty(l:node.parent)
+    if !empty(l:parent)
+        call l:parent.putCursorHere(1, 0)
+        call b:NERDTree.ui.centerView()
+    else
         call nerdtree#echo('could not jump to parent node')
-        return
     endif
-
-    call l:node.parent.putCursorHere(1, 0)
-    call b:NERDTree.ui.centerView()
 endfunction
 
 " FUNCTION: s:jumpToRoot() {{{1
@@ -423,22 +454,19 @@ function! s:jumpToPrevSibling(node)
     call s:jumpToSibling(a:node, 0)
 endfunction
 
-" FUNCTION: s:jumpToSibling(node, forward) {{{2
-" Move the cursor to the next or previous node at the same file system level.
+" FUNCTION: s:jumpToSibling(currentNode, forward) {{{2
+" moves the cursor to the sibling of the current node in the given direction
 "
 " Args:
-" node: the node on which the cursor currently sits
-" forward: 0 to jump to previous sibling, 1 to jump to next sibling
-function! s:jumpToSibling(node, forward)
-    let l:node = a:node.path.isDirectory ? a:node.getCascadeRoot() : a:node
-    let l:sibling = l:node.findSibling(a:forward)
+" forward: 1 if the cursor should move to the next sibling, 0 if it should
+" move back to the previous sibling
+function! s:jumpToSibling(currentNode, forward)
+    let sibling = a:currentNode.findSibling(a:forward)
 
-    if empty(l:sibling)
-        return
+    if !empty(sibling)
+        call sibling.putCursorHere(1, 0)
+        call b:NERDTree.ui.centerView()
     endif
-
-    call l:sibling.putCursorHere(1, 0)
-    call b:NERDTree.ui.centerView()
 endfunction
 
 " FUNCTION: nerdtree#ui_glue#openBookmark(name) {{{1
@@ -598,33 +626,40 @@ function! s:toggleZoom()
     call b:NERDTree.ui.toggleZoom()
 endfunction
 
-" FUNCTION: nerdtree#ui_glue#upDir(preserveState) {{{1
-" Move the NERDTree up one level.
+"FUNCTION: nerdtree#ui_glue#upDir(keepState) {{{1
+"moves the tree up a level
 "
-" Args:
-" preserveState: if 1, the current root is left open when the new tree is
-" rendered; if 0, the current root node is closed
-function! nerdtree#ui_glue#upDir(preserveState)
+"Args:
+"keepState: 1 if the current root should be left open when the tree is
+"re-rendered
+function! nerdtree#ui_glue#upDir(keepState)
+    let cwd = b:NERDTree.root.path.str({'format': 'UI'})
+    if cwd ==# "/" || cwd =~# '^[^/]..$'
+        call nerdtree#echo("already at top dir")
+    else
+        if !a:keepState
+            call b:NERDTree.root.close()
+        endif
 
-    try
-        call b:NERDTree.root.cacheParent()
-    catch /^NERDTree.CannotCacheParentError/
-        call nerdtree#echo('already at root directory')
-        return
-    endtry
+        let oldRoot = b:NERDTree.root
 
-    let l:oldRoot = b:NERDTree.root
-    let l:newRoot = b:NERDTree.root.parent
+        if empty(b:NERDTree.root.parent)
+            let path = b:NERDTree.root.path.getParent()
+            let newRoot = g:NERDTreeDirNode.New(path, b:NERDTree)
+            call newRoot.open()
+            call newRoot.transplantChild(b:NERDTree.root)
+            let b:NERDTree.root = newRoot
+        else
+            let b:NERDTree.root = b:NERDTree.root.parent
+        endif
 
-    call l:newRoot.open()
-    call l:newRoot.transplantChild(l:oldRoot)
+        if g:NERDTreeChDirMode ==# 2
+            call b:NERDTree.root.path.changeToDir()
+        endif
 
-    if !a:preserveState
-        call l:oldRoot.close()
+        call b:NERDTree.render()
+        call oldRoot.putCursorHere(0, 0)
     endif
-
-    call b:NERDTree.changeRoot(l:newRoot)
-    call l:oldRoot.putCursorHere(0, 0)
 endfunction
 
 " FUNCTION: s:upDirCurrentRootOpen() {{{1
