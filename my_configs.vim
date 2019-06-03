@@ -37,3 +37,4 @@ noremap <silent><leader>8 :tabn 8<cr>
 noremap <silent><leader>9 :tabn 9<cr>
 noremap <silent><leader>0 :tabn 10<cr>
 
+hi Search term=standout cterm=bold ctermfg=7 ctermbg=1
