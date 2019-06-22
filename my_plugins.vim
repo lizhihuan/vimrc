@@ -1,0 +1,17 @@
+nmap <f2> :NERDTreeToggle<cr>
+nmap <f3> :Tlist<cr>
+nmap <f5> :e!<cr>G
+nmap - <c-w>_
+nmap = <c-w>=
+nmap _ <c-w>-
+nmap + <c-w>+
+nmap \| <c-w>\|
+nmap <leader>v :vs<cr>
+nmap <leader>x :sp<cr>
+nmap <leader>q :q<cr>
+"nmap <leader>n :tabnew<cr>
+nmap <leader>tc :$tabclose
+nmap <leader>tm :tabm
+nmap <leader>p :CtrlP
+nmap <leader>cd :pwd<cr>
+"nmap <leader>m :marks<cr>
