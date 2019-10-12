@@ -184,3 +184,50 @@ nnoremap <silent> <leader>d :GitGutterToggle<cr>
 let Tlist_Show_One_File=1     "不同时显示多个文件的tag，只显示当前文件的   
 let Tlist_Exit_OnlyWindow=1   "如果taglist窗口是最后一个窗口，则退出vim  
 let Tlist_Ctags_Cmd="/usr/bin/ctags" "将taglist与ctags关联  "
+
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" => YouCompleteMe 
+" """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+"默认配置文件路径"
+"let g:ycm_global_ycm_extra_conf = '~/.vim/bundle/YouCompleteMe/python/ycm/tests/testdata/.ycm_extra_conf.py'
+let g:ycm_global_ycm_extra_conf='~/global_extra_conf.py'
+let g:syntastic_ignore_files=[".*\.py$"] 
+"打开vim时不再询问是否加载ycm_extra_conf.py配置"
+let g:ycm_confirm_extra_conf=0
+set completeopt=longest,menu
+"python解释器路径"
+let g:ycm_path_to_python_interpreter='/projects/python3/bin/python'
+
+
+let g:ycm_python_interpreter_path = '/projects/python3/bin/python'
+let g:ycm_python_sys_path = []
+let g:ycm_extra_conf_vim_data = [
+  \  'g:ycm_python_interpreter_path',
+  \  'g:ycm_python_sys_path'
+  \]
+
+"是否开启语义补全"
+let g:ycm_seed_identifiers_with_syntax=1
+"是否在注释中也开启补全"
+let g:ycm_complete_in_comments=0
+let g:ycm_collect_identifiers_from_comments_and_strings = 0
+"开始补全的字符数"
+let g:ycm_min_num_of_chars_for_completion=2
+"补全后自动关机预览窗口"
+let g:ycm_autoclose_preview_window_after_completion=1
+" 禁止缓存匹配项,每次都重新生成匹配项"
+let g:ycm_cache_omnifunc=0
+"字符串中也开启补全"
+let g:ycm_complete_in_strings = 1
+"离开插入模式后自动关闭预览窗口"
+autocmd InsertLeave * if pumvisible() == 0|pclose|endif
+"回车即选中当前项"
+"inoremap <expr> <CR>       pumvisible() ? '<C-y>' : '\<CR>'     
+"上下左右键行为"
+inoremap <expr> <Down>     pumvisible() ? '\<C-n>' : '\<Down>'
+inoremap <expr> <Up>       pumvisible() ? '\<C-p>' : '\<Up>'
+inoremap <expr> <PageDown> pumvisible() ? '\<PageDown>\<C-p>\<C-n>' : '\<PageDown>'
+inoremap <expr> <PageUp>   pumvisible() ? '\<PageUp>\<C-p>\<C-n>' : '\<PageUp>'
+nmap <leader>jd :YcmCompleter GoTo<cr>
+nmap <f4> :YcmCompleter GetDoc<cr>
