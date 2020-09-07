@@ -84,7 +84,7 @@ nmap \| <c-w>\|
 nmap <leader>v :vs<cr>
 nmap <leader>x :sp<cr>
 nmap <leader>q :q<cr>
-nmap <leader>n :tabnew<cr>
+"nmap <leader>n :tabnew<cr>
 nmap <leader>t :$tabe 
 nmap <leader>tm :tabm 
 nmap <leader>p :CtrlP 

@@ -1,4 +1,4 @@
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " Important:
 "       This requries that you install https://github.com/amix/vimrc !
 "
@@ -135,7 +135,7 @@ let g:lightline = {
 let g:goyo_width=100
 let g:goyo_margin_top = 2
 let g:goyo_margin_bottom = 2
-nnoremap <silent> <leader>z :Goyo<cr>
+"nnoremap <silent> <leader>z :Goyo<cr>
 
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -166,6 +166,8 @@ func! SyntasticCheckCoffeescript()
 endfunc
 nnoremap <silent> <leader>c :call SyntasticCheckCoffeescript()<cr>
 
+let g:syntastic_check_on_open = 0
+let g:syntastic_check_on_wq = 0
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " => Git gutter (Git diff)
@@ -181,16 +183,27 @@ let g:vue_disable_pre_processors=1
 " => YouCompleteMe 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 "默认配置文件路径"
-"let g:ycm_global_ycm_extra_conf = '~/.ycm_extra_conf.py'
+"let g:ycm_global_ycm_extra_conf = '~/.vim/bundle/YouCompleteMe/python/ycm/tests/testdata/.ycm_extra_conf.py'
+let g:ycm_global_ycm_extra_conf='~/global_extra_conf.py'
+let g:syntastic_ignore_files=[".*\.py$"] 
 "打开vim时不再询问是否加载ycm_extra_conf.py配置"
 let g:ycm_confirm_extra_conf=0
 set completeopt=longest,menu
 "python解释器路径"
 let g:ycm_path_to_python_interpreter='/data/Projects/python3/bin/python'
+
+
+let g:ycm_python_interpreter_path = '/data/Projects/python3/bin/python'
+let g:ycm_python_sys_path = []
+let g:ycm_extra_conf_vim_data = [
+  \  'g:ycm_python_interpreter_path',
+  \  'g:ycm_python_sys_path'
+  \]
+
 "是否开启语义补全"
 let g:ycm_seed_identifiers_with_syntax=1
 "是否在注释中也开启补全"
-let g:ycm_complete_in_comments=1
+let g:ycm_complete_in_comments=0
 let g:ycm_collect_identifiers_from_comments_and_strings = 0
 "开始补全的字符数"
 let g:ycm_min_num_of_chars_for_completion=2
@@ -203,9 +216,11 @@ let g:ycm_complete_in_strings = 1
 "离开插入模式后自动关闭预览窗口"
 autocmd InsertLeave * if pumvisible() == 0|pclose|endif
 "回车即选中当前项"
-inoremap <expr> <CR>       pumvisible() ? '<C-y>' : '\<CR>'     
+"inoremap <expr> <CR>       pumvisible() ? '<C-y>' : '\<CR>'     
 "上下左右键行为"
 inoremap <expr> <Down>     pumvisible() ? '\<C-n>' : '\<Down>'
 inoremap <expr> <Up>       pumvisible() ? '\<C-p>' : '\<Up>'
 inoremap <expr> <PageDown> pumvisible() ? '\<PageDown>\<C-p>\<C-n>' : '\<PageDown>'
 inoremap <expr> <PageUp>   pumvisible() ? '\<PageUp>\<C-p>\<C-n>' : '\<PageUp>'
+nmap <leader>jd :YcmCompleter GoTo<cr>
+nmap <f4> :YcmCompleter GetDoc<cr>
